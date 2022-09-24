@@ -3,6 +3,7 @@ from importlib import import_module
 from typing import Any
 
 from common.tensor import DataSpec
+from modules import module_classes
 
 current_framework = None
 
@@ -24,37 +25,46 @@ class Module:
     def set_dataspec(self, dataspec: dict):
         self.dataspec = dataspec
 
-    def map_ops(self, ops: dict):
-        for opname, op in ops.items():
-            setattr(self, opname, op)
+    def load_ops(self, api):
+        for name in dir(api):
+            setattr(self, name, getattr(api, name))
         return self
 
-    def prepare_data(self, datagen):
+    def prepare_data(self):
         for dataname, spec in self.dataspec.items():
-            setattr(self, dataname, datagen(spec))
+            setattr(self, dataname, self.data_gen(spec))
         return self
 
     def compute(self):
         pass
 
 class TestModule:
-    def __init__(self, module: Module, input_spec: dict) -> None:
+    def __init__(self, module: Module, *args, **kwargs) -> None:
         self.module = module
-        self.input_spec = input_spec
 
     def run(self, framework: str, repeat: int):
         global current_framework
         if framework == 'torch':
-            from .torch import ops, data_gen
+            from . import torch as api 
         elif framework == 'tfxla':
-            from .tfxla import ops, data_gen
+            from . import tfxla as api
         elif framework == 'jax':
-            from .jax import ops, data_gen
+            from . import jax as api
         else:
             raise ValueError()
         
-        self.module.map_ops().prepare_data(data_gen)
+        self.module.load_ops(api).prepare_data()
 
         for _ in range(repeat):
             self.module.compute()
         
+
+
+if __name__ == '__main__':
+    all_tests = []
+    for mod in module_classes:
+        if hasattr(mod, 'TESTS'):
+            all_tests += [TestModule(mod(*args)) for args in mod.TESTS]
+
+    for test in all_tests:
+        test.run('torch', repeat=3)

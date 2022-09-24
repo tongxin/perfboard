@@ -1,13 +1,14 @@
 import math
-from typing import Optional, Tuple
-
-import torch
-from torch import nn
 
 from common.tensor import DataSpec
-from benchmark import Module
+from benchmark import Module, TestModule
 
 class AttentionOutput(Module):
+    TESTS = [
+        (768, 0.1, 1e-12),
+        (1024, 0.1, 1e-12)
+    ]
+
     def __init__(self, hidden_size: int, hidden_dropout_prob: float, layernorm_eps: float, dtype=None):
         super().__init__(module_name="AttentionOutput")
         dtype = dtype or 'float'
