@@ -2,8 +2,7 @@ import copy
 from importlib import import_module
 from typing import Any
 
-from common.tensor import DataSpec
-from modules import module_classes
+from .common.tensor import DataSpec
 
 current_framework = None
 
@@ -25,14 +24,14 @@ class Module:
     def set_dataspec(self, dataspec: dict):
         self.dataspec = dataspec
 
-    def load_ops(self, api):
-        for name in dir(api):
-            setattr(self, name, getattr(api, name))
+    def load_ops(self, ops):
+        for name in ops.oplist:
+            setattr(self, name, getattr(ops, name))
         return self
 
-    def prepare_data(self):
+    def prepare_data(self, gen):
         for dataname, spec in self.dataspec.items():
-            setattr(self, dataname, self.data_gen(spec))
+            setattr(self, dataname, gen.data_gen(spec))
         return self
 
     def compute(self):
@@ -44,27 +43,24 @@ class TestModule:
 
     def run(self, framework: str, repeat: int):
         global current_framework
+
         if framework == 'torch':
-            from . import torch as api 
+            from .torch import _ops as ops
+            from .torch import _datagen as gen
         elif framework == 'tfxla':
-            from . import tfxla as api
+            pass
         elif framework == 'jax':
-            from . import jax as api
+            pass
         else:
             raise ValueError()
-        
-        self.module.load_ops(api).prepare_data()
+
+        current_framework = framework
+
+        self.module.load_ops(ops).prepare_data(gen)
 
         for _ in range(repeat):
             self.module.compute()
-        
+
+        current_framework = None
 
 
-if __name__ == '__main__':
-    all_tests = []
-    for mod in module_classes:
-        if hasattr(mod, 'TESTS'):
-            all_tests += [TestModule(mod(*args)) for args in mod.TESTS]
-
-    for test in all_tests:
-        test.run('torch', repeat=3)
